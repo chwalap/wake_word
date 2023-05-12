@@ -13,7 +13,7 @@ struct token_manager
 {
   token_manager();
   const std::string& get_token();
-  void fetch_new_token();
+  void get_new_token();
   bool token_expired();
   std::string extract_json(const std::string& input);
   std::string prepare_token_request();

@@ -6,13 +6,10 @@
 
 #include "config.h"
 
-using audio_buffer = std::array<uint16_t, AUDIO_BUFFER_LENGTH>;
+using audio_buffer = std::array<int16_t, AUDIO_BUFFER_LENGTH>;
 using audio_buffer_ptr = std::unique_ptr<audio_buffer>;
 using audio_buffer_arr = std::array<audio_buffer_ptr, NO_I2S_BUFFERS>;
 using audio_buffers_ptr = std::shared_ptr<audio_buffer_arr>;
-
-// todo: add documentation
-// todo: add tests
 
 struct ring_buffer
 {
@@ -42,7 +39,7 @@ struct ring_buffer
     return (*m_current_buffer)[m_buffer_pos];
   }
 
-  void set_current_sample(uint16_t sample)
+  void set_current_sample(int16_t sample)
   {
     (*m_current_buffer)[m_buffer_pos] = sample;
   }

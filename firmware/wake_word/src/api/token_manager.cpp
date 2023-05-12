@@ -11,19 +11,19 @@ token_manager::token_manager()
   m_ntp_client.begin();
   m_client.setInsecure();
 
-  // todo: create task for this
-  fetch_new_token();
+  // todo: create task for this to speed up initialization
+  get_new_token();
 }
 
 const std::string& token_manager::get_token()
 {
   if (token_expired())
-    fetch_new_token();
+    get_new_token();
 
   return m_token;
 }
 
-void token_manager::fetch_new_token()
+void token_manager::get_new_token()
 {
   m_token.clear();
 

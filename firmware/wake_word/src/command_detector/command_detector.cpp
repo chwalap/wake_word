@@ -1,12 +1,14 @@
 #include "command_detector.h"
 #include "detection_context.h"
 #include "config.h"
+#include "led/led_driver.h"
 
 #include <esp32-hal.h>
 #include <HardwareSerial.h>
 
 extern i2s_sampler_ptr sampler;
 extern detection_context_ptr detection_ctx;
+extern led_driver_ptr led;
 
 command_detector::command_detector()
 {
@@ -39,6 +41,7 @@ void command_detector::detect_wake_word()
       m_last_detection = start;
       Serial.println("Detected komputer!");
       detection_ctx->m_is_detector_running = false;
+      led->set_color(CRGB::Orange);
     }
   }
 }

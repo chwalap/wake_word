@@ -32,6 +32,8 @@ struct google_speech_api
   size_t m_silence_lenght;
   size_t m_read_idx;
   bool m_is_recording;
+  bool m_recording_first_segment;
+  int16_t m_max_value_first_segment;
   WiFiClientSecure m_client;
 };
 

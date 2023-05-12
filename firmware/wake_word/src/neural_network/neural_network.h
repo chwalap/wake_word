@@ -24,9 +24,6 @@ using tflite_tensor_arena_ptr = std::unique_ptr<tflite_tensor_arena_arr>;
 using tflite_model_ptr = tflite::Model*;
 using tflite_tensor_ptr = TfLiteTensor*;
 
-// todo: add documentation
-// todo: add tests
-
 struct neural_network
 {
   neural_network();

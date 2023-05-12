@@ -7,9 +7,6 @@
 
 #include <memory>
 
-// todo: add documentation
-// todo: add tests
-
 struct command_detector
 {
   command_detector();
