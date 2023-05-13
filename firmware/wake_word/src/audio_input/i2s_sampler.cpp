@@ -35,8 +35,8 @@ void i2s_sampler::start()
     .data_in_num = AUDIO_IN_DATA_PIN
   };
 
-  i2s_driver_install(I2S_NUM_0, &i2s_config, 4, &m_queue);
-  i2s_set_pin(I2S_NUM_0, &i2s_pins);
+  assert(i2s_driver_install(I2S_NUM_0, &i2s_config, 4, &m_queue) == ESP_OK);
+  assert(i2s_set_pin(I2S_NUM_0, &i2s_pins) == ESP_OK);
 
   xTaskCreatePinnedToCore(
     [](void *p)

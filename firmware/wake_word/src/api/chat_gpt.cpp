@@ -7,7 +7,7 @@
 
 extern led_driver_ptr led;
 
-const char* APIKEY = "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";
+const char* APIKEY = "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";
 const char* OPENAI_API = "api.openai.com";
 
 chat_gpt::chat_gpt()
@@ -58,7 +58,7 @@ std::string chat_gpt::send_message(const std::string& message)
         break;
 
       const std::string response = std::string{data.c_str()};
-      // Serial.println(response.c_str());
+      // Serial.println(line.c_str());
       deserializeJson(*json, response);
       String content = (*json)["choices"][0]["delta"]["content"];
       if (content != "null")

@@ -69,6 +69,8 @@ void google_speech_api::speech_to_text()
       }
 
       // stop recording when 1s of silence
+      // todo: something is not working here... problem with longer than 5s recordings
+      // todo: maybe the problem is related to ring buffer?
       if (!m_recording_first_segment && sample_abs < m_max_value_first_segment)
       {
         ++m_silence_lenght;
@@ -145,10 +147,10 @@ void google_speech_api::speech_to_text()
   auto json = std::make_unique<StaticJsonDocument<4096>>();
   deserializeJson(*json, json_response);
   String transcript = (*json)["results"][0]["alternatives"][0]["transcript"];
-  // Serial.printf(
-  //   "========================================================================================================================\n"
-  //   "Transcript: %s\n"
-  //   "========================================================================================================================\n", transcript.c_str());
+  Serial.printf(
+    "========================================================================================================================\n"
+    "Transcript: %s\n"
+    "========================================================================================================================\n", transcript.c_str());
 
   m_is_recording = false;
   m_client.stop();
