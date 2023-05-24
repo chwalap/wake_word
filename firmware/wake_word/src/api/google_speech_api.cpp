@@ -5,6 +5,7 @@
 #include "utils/base64.h"
 #include "utils/response_parser.h"
 #include "led/led_driver.h"
+#include "audio_output/speech_synthesizer.h"
 
 #include <ArduinoJson.h>
 #include <sstream>
@@ -13,6 +14,7 @@ extern i2s_sampler_ptr sampler;
 extern detection_context_ptr detection_ctx;
 extern chat_gpt_ptr chat;
 extern led_driver_ptr led;
+extern speech_synthesizer_ptr synthesizer;
 
 const char GOOGLE_SPEECH_API[] PROGMEM = "speech.googleapis.com";
 
@@ -98,6 +100,8 @@ void google_speech_api::speech_to_text()
   if (!recording_completed)
     return;
 
+  synthesizer->say("Daj mi pomyśleć.");
+
   led->set_color(CRGB::Green);
 
   m_client.stop();
@@ -132,13 +136,15 @@ void google_speech_api::speech_to_text()
   }
   // Serial.printf("Sent bytes: %zu\nRequest: %zu\n", all_sent_bytes, request.length());
 
+  synthesizer->say("Jeszcze chwila.");
+
   String resp;
   auto recv_start = millis();
   while (resp.isEmpty() && millis() - recv_start < RECV_RESPONSE_TIMEOUT)
   {
     resp += m_client.readString();
   }
-  // m_client.readString();
+
   const std::string response = std::string{resp.c_str()};
   // Serial.printf("Response: %s\n", response.c_str());
   const auto json_response = extract_json(response);
@@ -149,11 +155,13 @@ void google_speech_api::speech_to_text()
   String transcript = (*json)["results"][0]["alternatives"][0]["transcript"];
   Serial.printf(
     "========================================================================================================================\n"
-    "Transcript: %s\n"
+    "Speech-To-Text: %s\n"
     "========================================================================================================================\n", transcript.c_str());
 
   m_is_recording = false;
   m_client.stop();
+
+  synthesizer->say("Dobra, już Ci mówię.");
 
   if (transcript != "null" && transcript.substring(0, 8) == "komputer")
     chat->send_message(std::string{transcript.substring(9).c_str()});

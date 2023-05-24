@@ -61,5 +61,6 @@ size_t command_detector::get_best_score_idx() const
       best_index = i;
     }
   }
+
   return best_index;
 }

@@ -5,6 +5,9 @@
 #include <stddef.h>
 #include <math.h>
 
+// todo: determine the value empirically
+const unsigned long SERIAL_CONNECTION_TIMEOUT = 1000;
+
 // Audio sample rate for the whole project
 const uint32_t SAMPLE_RATE = 16000;
 
@@ -34,8 +37,8 @@ const size_t ENERGY_SIZE = FFT_SIZE / 2 + 1;
 const size_t ENERGY_POOLED_SIZE = (size_t) ceil((float)ENERGY_SIZE / (float)POOLING_SIZE);
 
 // Neural network settings
-// todo: create my own tool for this
-const size_t TENSOR_ARENA_SIZE = 77776; // calculated by https://github.com/edgeimpulse/tflite-find-arena-size
+// todo: create my own tool for calculating area size
+const size_t TENSOR_ARENA_SIZE = 297184; // calculated by https://github.com/edgeimpulse/tflite-find-arena-size
 // todo: retrain network and change to 2 or even 1 (binary crossentropy should be better (would be able to adjust threshold) and faster (smaller network))
 const size_t NO_COMMANDS = 3;
 const size_t TARGET_WORD_IDX = 0;
@@ -60,10 +63,10 @@ const unsigned long RECV_RESPONSE_TIMEOUT = 10000;
 const unsigned long CHATGPT_RECV_RESPONSE_TIMEOUT = 120000; // todo: maybe even longer?
 
 // Speech synthesis settings
-const float SPEECH_SYNTHESIS_PITCH = 1.f;
-const float SPEECH_SYNTHESIS_SPEED = 1.f;
+const float SPEECH_SYNTHESIS_PITCH = 0.9f;
+const float SPEECH_SYNTHESIS_SPEED = 1.1f;
 const float SPEECH_SYNTHESIS_VOLUME = 1.f;
-const float SPEECH_SYNTHESIS_GAIN = 1.f;
+const float SPEECH_SYNTHESIS_GAIN = 0.3f;
 const int SPEECH_SYNTHESIS_CONTRAST = 0;
 
 // LED settings
