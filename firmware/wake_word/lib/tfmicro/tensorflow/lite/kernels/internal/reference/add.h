@@ -15,6 +15,9 @@ limitations under the License.
 #ifndef TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_ADD_H_
 #define TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_ADD_H_
 
+#include <algorithm>
+#include <type_traits>
+
 #include "fixedpoint/fixedpoint.h"
 #include "tensorflow/lite/kernels/internal/common.h"
 
@@ -27,25 +30,14 @@ inline void Add(const ArithmeticParams& params,
                 const RuntimeShape& input1_shape, const T* input1_data,
                 const RuntimeShape& input2_shape, const T* input2_data,
                 const RuntimeShape& output_shape, T* output_data) {
+  T activation_min, activation_max;
+  GetActivationParams(params, &activation_min, &activation_max);
+
   const int flat_size =
       MatchingElementsSize(input1_shape, input2_shape, output_shape);
   for (int i = 0; i < flat_size; ++i) {
     output_data[i] = ActivationFunctionWithMinMax(
-        input1_data[i] + input2_data[i], params.quantized_activation_min,
-        params.quantized_activation_max);
-  }
-}
-
-inline void Add(const ArithmeticParams& params,
-                const RuntimeShape& input1_shape, const float* input1_data,
-                const RuntimeShape& input2_shape, const float* input2_data,
-                const RuntimeShape& output_shape, float* output_data) {
-  const int flat_size =
-      MatchingElementsSize(input1_shape, input2_shape, output_shape);
-  for (int i = 0; i < flat_size; i++) {
-    auto x = input1_data[i] + input2_data[i];
-    output_data[i] = ActivationFunctionWithMinMax(
-        x, params.float_activation_min, params.float_activation_max);
+        input1_data[i] + input2_data[i], activation_min, activation_max);
   }
 }
 
@@ -202,27 +194,23 @@ inline void Add(const ArithmeticParams& params,
   }
 }
 
-// TODO(jiawen): We can implement BroadcastAdd on buffers of arbitrary
-// dimensionality if the runtime code does a single loop over one dimension
-// that handles broadcasting as the base case. The code generator would then
-// generate max(D1, D2) nested for loops.
-// TODO(benoitjacob): BroadcastAdd is intentionally duplicated from
-// reference_ops.h. Once an optimized version is implemented and NdArrayDesc<T>
-// is no longer referenced in this file, move NdArrayDesc<T> from types.h to
-// reference_ops.h.
-inline void BroadcastAdd4DSlow(const ArithmeticParams& params,
-                               const RuntimeShape& input1_shape,
-                               const float* input1_data,
-                               const RuntimeShape& input2_shape,
-                               const float* input2_data,
-                               const RuntimeShape& output_shape,
-                               float* output_data) {
-  NdArrayDesc<4> desc1;
-  NdArrayDesc<4> desc2;
+template <typename T,
+          // For unquantized add for small integers, explictly set to true.
+          bool dummy = false>
+inline typename std::enable_if<!is_small_integer<T>::value || dummy, void>::type
+BroadcastAdd6DSlow(const ArithmeticParams& params,
+                   const RuntimeShape& input1_shape, const T* input1_data,
+                   const RuntimeShape& input2_shape, const T* input2_data,
+                   const RuntimeShape& output_shape, T* output_data) {
+  NdArrayDesc<6> desc1;
+  NdArrayDesc<6> desc2;
   NdArrayDescsForElementwiseBroadcast(input1_shape, input2_shape, &desc1,
                                       &desc2);
   const RuntimeShape extended_output_shape =
-      RuntimeShape::ExtendedShape(4, output_shape);
+      RuntimeShape::ExtendedShape(6, output_shape);
+
+  T activation_min, activation_max;
+  GetActivationParams(params, &activation_min, &activation_max);
 
   // In Tensorflow, the dimensions are canonically named (batch_number, row,
   // col, channel), with extents (batches, height, width, depth), with the
@@ -235,59 +223,64 @@ inline void BroadcastAdd4DSlow(const ArithmeticParams& params,
   // We name our variables by their Tensorflow convention, but generate C code
   // nesting loops such that the innermost loop has the smallest stride for the
   // best cache behavior.
-  for (int b = 0; b < extended_output_shape.Dims(0); ++b) {
-    for (int y = 0; y < extended_output_shape.Dims(1); ++y) {
-      for (int x = 0; x < extended_output_shape.Dims(2); ++x) {
-        for (int c = 0; c < extended_output_shape.Dims(3); ++c) {
-          output_data[Offset(extended_output_shape, b, y, x, c)] =
-              ActivationFunctionWithMinMax(
-                  input1_data[SubscriptToIndex(desc1, b, y, x, c)] +
-                      input2_data[SubscriptToIndex(desc2, b, y, x, c)],
-                  params.float_activation_min, params.float_activation_max);
+  size_t input1_offset_a = 0;
+  size_t input2_offset_a = 0;
+  size_t output_offset_a = 0;
+  for (int a = 0; a < extended_output_shape.Dims(0); ++a) {
+    size_t input1_offset_d = input1_offset_a;
+    size_t input2_offset_d = input2_offset_a;
+    size_t output_offset_d = output_offset_a;
+    for (int d = 0; d < extended_output_shape.Dims(1); ++d) {
+      size_t input1_offset_b = input1_offset_d;
+      size_t input2_offset_b = input2_offset_d;
+      size_t output_offset_b = output_offset_d;
+      for (int b = 0; b < extended_output_shape.Dims(2); ++b) {
+        size_t input1_offset_y = input1_offset_b;
+        size_t input2_offset_y = input2_offset_b;
+        size_t output_offset_y = output_offset_b;
+        for (int y = 0; y < extended_output_shape.Dims(3); ++y) {
+          size_t input1_offset_x = input1_offset_y;
+          size_t input2_offset_x = input2_offset_y;
+          size_t output_offset_x = output_offset_y;
+          for (int x = 0; x < extended_output_shape.Dims(4); ++x) {
+            size_t input1_offset_c = input1_offset_x;
+            size_t input2_offset_c = input2_offset_x;
+            size_t output_offset_c = output_offset_x;
+            for (int c = 0; c < extended_output_shape.Dims(5); ++c) {
+              output_data[output_offset_c] = ActivationFunctionWithMinMax<T>(
+                  input1_data[input1_offset_c] + input2_data[input2_offset_c],
+                  activation_min, activation_max);
+              input1_offset_c += desc1.strides[5];
+              input2_offset_c += desc2.strides[5];
+              ++output_offset_c;
+            }
+            input1_offset_x += desc1.strides[4];
+            input2_offset_x += desc2.strides[4];
+            output_offset_x += extended_output_shape.Dims(5);
+          }
+          input1_offset_y += desc1.strides[3];
+          input2_offset_y += desc2.strides[3];
+          output_offset_y +=
+              extended_output_shape.Dims(4) * extended_output_shape.Dims(5);
         }
+        input1_offset_b += desc1.strides[2];
+        input2_offset_b += desc2.strides[2];
+        output_offset_b += extended_output_shape.Dims(3) *
+                           extended_output_shape.Dims(4) *
+                           extended_output_shape.Dims(5);
       }
+      input1_offset_d += desc1.strides[1];
+      input2_offset_d += desc2.strides[1];
+      output_offset_d +=
+          extended_output_shape.Dims(2) * extended_output_shape.Dims(3) *
+          extended_output_shape.Dims(4) * extended_output_shape.Dims(5);
     }
-  }
-}
-
-inline void BroadcastAdd4DSlow(const ArithmeticParams& params,
-                               const RuntimeShape& input1_shape,
-                               const int32_t* input1_data,
-                               const RuntimeShape& input2_shape,
-                               const int32_t* input2_data,
-                               const RuntimeShape& output_shape,
-                               int32_t* output_data) {
-  NdArrayDesc<4> desc1;
-  NdArrayDesc<4> desc2;
-  NdArrayDescsForElementwiseBroadcast(input1_shape, input2_shape, &desc1,
-                                      &desc2);
-  const RuntimeShape extended_output_shape =
-      RuntimeShape::ExtendedShape(4, output_shape);
-
-  // In Tensorflow, the dimensions are canonically named (batch_number, row,
-  // col, channel), with extents (batches, height, width, depth), with the
-  // trailing dimension changing most rapidly (channels has the smallest stride,
-  // typically 1 element).
-  //
-  // In generated C code, we store arrays with the dimensions reversed. The
-  // first dimension has smallest stride.
-  //
-  // We name our variables by their Tensorflow convention, but generate C code
-  // nesting loops such that the innermost loop has the smallest stride for the
-  // best cache behavior.
-  for (int b = 0; b < extended_output_shape.Dims(0); ++b) {
-    for (int y = 0; y < extended_output_shape.Dims(1); ++y) {
-      for (int x = 0; x < extended_output_shape.Dims(2); ++x) {
-        for (int c = 0; c < extended_output_shape.Dims(3); ++c) {
-          output_data[Offset(extended_output_shape, b, y, x, c)] =
-              ActivationFunctionWithMinMax(
-                  input1_data[SubscriptToIndex(desc1, b, y, x, c)] +
-                      input2_data[SubscriptToIndex(desc2, b, y, x, c)],
-                  params.quantized_activation_min,
-                  params.quantized_activation_max);
-        }
-      }
-    }
+    input1_offset_a += desc1.strides[0];
+    input2_offset_a += desc2.strides[0];
+    output_offset_a +=
+        extended_output_shape.Dims(1) * extended_output_shape.Dims(2) *
+        extended_output_shape.Dims(3) * extended_output_shape.Dims(4) *
+        extended_output_shape.Dims(5);
   }
 }
 
@@ -295,16 +288,17 @@ inline void BroadcastAdd4DSlow(const ArithmeticParams& params,
 // is 32-bit for both cases. The overflow does not happen due to the
 // choice of the shift (20 or 15, accordingly - see add.cc for more comments).
 template <typename T>
-inline void BroadcastAdd4DSlow(
-    const ArithmeticParams& params, const RuntimeShape& input1_shape,
-    const T* input1_data, const RuntimeShape& input2_shape,
-    const T* input2_data, const RuntimeShape& output_shape, T* output_data) {
-  NdArrayDesc<4> desc1;
-  NdArrayDesc<4> desc2;
+inline typename std::enable_if<is_small_integer<T>::value, void>::type
+BroadcastAdd6DSlow(const ArithmeticParams& params,
+                   const RuntimeShape& input1_shape, const T* input1_data,
+                   const RuntimeShape& input2_shape, const T* input2_data,
+                   const RuntimeShape& output_shape, T* output_data) {
+  NdArrayDesc<6> desc1;
+  NdArrayDesc<6> desc2;
   NdArrayDescsForElementwiseBroadcast(input1_shape, input2_shape, &desc1,
                                       &desc2);
   const RuntimeShape extended_output_shape =
-      RuntimeShape::ExtendedShape(4, output_shape);
+      RuntimeShape::ExtendedShape(6, output_shape);
 
   // In Tensorflow, the dimensions are canonically named (batch_number, row,
   // col, channel), with extents (batches, height, width, depth), with the
@@ -317,42 +311,96 @@ inline void BroadcastAdd4DSlow(
   // We name our variables by their Tensorflow convention, but generate C code
   // nesting loops such that the innermost loop has the smallest stride for the
   // best cache behavior.
-  for (int b = 0; b < extended_output_shape.Dims(0); ++b) {
-    for (int y = 0; y < extended_output_shape.Dims(1); ++y) {
-      for (int x = 0; x < extended_output_shape.Dims(2); ++x) {
-        for (int c = 0; c < extended_output_shape.Dims(3); ++c) {
-          const int32_t input1_val =
-              params.input1_offset +
-              input1_data[SubscriptToIndex(desc1, b, y, x, c)];
-          const int32_t input2_val =
-              params.input2_offset +
-              input2_data[SubscriptToIndex(desc2, b, y, x, c)];
-          const int32_t shifted_input1_val =
-              input1_val * (1 << params.left_shift);
-          const int32_t shifted_input2_val =
-              input2_val * (1 << params.left_shift);
-          const int32_t scaled_input1_val =
-              MultiplyByQuantizedMultiplierSmallerThanOneExp(
-                  shifted_input1_val, params.input1_multiplier,
-                  params.input1_shift);
-          const int32_t scaled_input2_val =
-              MultiplyByQuantizedMultiplierSmallerThanOneExp(
-                  shifted_input2_val, params.input2_multiplier,
-                  params.input2_shift);
-          const int32_t raw_sum = scaled_input1_val + scaled_input2_val;
-          const int32_t raw_output =
-              MultiplyByQuantizedMultiplierSmallerThanOneExp(
-                  raw_sum, params.output_multiplier, params.output_shift) +
-              params.output_offset;
-          const int32_t clamped_output =
-              std::min(params.quantized_activation_max,
-                       std::max(params.quantized_activation_min, raw_output));
-          output_data[Offset(extended_output_shape, b, y, x, c)] =
-              static_cast<T>(clamped_output);
+  size_t input1_offset_a = 0;
+  size_t input2_offset_a = 0;
+  size_t output_offset_a = 0;
+  for (int a = 0; a < extended_output_shape.Dims(0); ++a) {
+    size_t input1_offset_d = input1_offset_a;
+    size_t input2_offset_d = input2_offset_a;
+    size_t output_offset_d = output_offset_a;
+    for (int d = 0; d < extended_output_shape.Dims(1); ++d) {
+      size_t input1_offset_b = input1_offset_d;
+      size_t input2_offset_b = input2_offset_d;
+      size_t output_offset_b = output_offset_d;
+      for (int b = 0; b < extended_output_shape.Dims(2); ++b) {
+        size_t input1_offset_y = input1_offset_b;
+        size_t input2_offset_y = input2_offset_b;
+        size_t output_offset_y = output_offset_b;
+        for (int y = 0; y < extended_output_shape.Dims(3); ++y) {
+          size_t input1_offset_x = input1_offset_y;
+          size_t input2_offset_x = input2_offset_y;
+          size_t output_offset_x = output_offset_y;
+          for (int x = 0; x < extended_output_shape.Dims(4); ++x) {
+            size_t input1_offset_c = input1_offset_x;
+            size_t input2_offset_c = input2_offset_x;
+            size_t output_offset_c = output_offset_x;
+            for (int c = 0; c < extended_output_shape.Dims(5); ++c) {
+              const int32_t input1_val =
+                  params.input1_offset + input1_data[input1_offset_c];
+              const int32_t input2_val =
+                  params.input2_offset + input2_data[input2_offset_c];
+              const int32_t shifted_input1_val =
+                  input1_val * (1 << params.left_shift);
+              const int32_t shifted_input2_val =
+                  input2_val * (1 << params.left_shift);
+              const int32_t scaled_input1_val =
+                  MultiplyByQuantizedMultiplierSmallerThanOneExp(
+                      shifted_input1_val, params.input1_multiplier,
+                      params.input1_shift);
+              const int32_t scaled_input2_val =
+                  MultiplyByQuantizedMultiplierSmallerThanOneExp(
+                      shifted_input2_val, params.input2_multiplier,
+                      params.input2_shift);
+              const int32_t raw_sum = scaled_input1_val + scaled_input2_val;
+              const int32_t raw_output =
+                  MultiplyByQuantizedMultiplierSmallerThanOneExp(
+                      raw_sum, params.output_multiplier, params.output_shift) +
+                  params.output_offset;
+              const int32_t clamped_output = std::min(
+                  params.quantized_activation_max,
+                  std::max(params.quantized_activation_min, raw_output));
+              output_data[output_offset_c] = static_cast<T>(clamped_output);
+              input1_offset_c += desc1.strides[5];
+              input2_offset_c += desc2.strides[5];
+              ++output_offset_c;
+            }
+            input1_offset_x += desc1.strides[4];
+            input2_offset_x += desc2.strides[4];
+            output_offset_x += extended_output_shape.Dims(5);
+          }
+          input1_offset_y += desc1.strides[3];
+          input2_offset_y += desc2.strides[3];
+          output_offset_y +=
+              extended_output_shape.Dims(4) * extended_output_shape.Dims(5);
         }
+        input1_offset_b += desc1.strides[2];
+        input2_offset_b += desc2.strides[2];
+        output_offset_b += extended_output_shape.Dims(3) *
+                           extended_output_shape.Dims(4) *
+                           extended_output_shape.Dims(5);
       }
+      input1_offset_d += desc1.strides[1];
+      input2_offset_d += desc2.strides[1];
+      output_offset_d +=
+          extended_output_shape.Dims(2) * extended_output_shape.Dims(3) *
+          extended_output_shape.Dims(4) * extended_output_shape.Dims(5);
     }
+    input1_offset_a += desc1.strides[0];
+    input2_offset_a += desc2.strides[0];
+    output_offset_a +=
+        extended_output_shape.Dims(1) * extended_output_shape.Dims(2) *
+        extended_output_shape.Dims(3) * extended_output_shape.Dims(4) *
+        extended_output_shape.Dims(5);
   }
+}
+
+template <typename T>
+inline void BroadcastAdd4DSlow(
+    const ArithmeticParams& params, const RuntimeShape& input1_shape,
+    const T* input1_data, const RuntimeShape& input2_shape,
+    const T* input2_data, const RuntimeShape& output_shape, T* output_data) {
+  return BroadcastAdd6DSlow(params, input1_shape, input1_data, input2_shape,
+                            input2_data, output_shape, output_data);
 }
 
 inline void BroadcastAddFivefold(const ArithmeticParams& unswitched_params,

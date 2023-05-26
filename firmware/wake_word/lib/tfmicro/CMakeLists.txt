@@ -1,38 +1,115 @@
+## TODO: GLOB is not a good way to collect files. Use explicit file list instead
 
-# Copyright 2019 The TensorFlow Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+cmake_minimum_required(VERSION 3.5)
 
-#
-# This component was generated for the 'hello_world' TF Micro example.
-#
+set(tflite_dir "${CMAKE_CURRENT_SOURCE_DIR}/tensorflow/lite")
+set(tfmicro_dir "${tflite_dir}/micro")
+set(tfmicro_frontend_dir "${tflite_dir}/experimental/microfrontend/lib")
+set(tfmicro_kernels_dir "${tfmicro_dir}/kernels")
 
-# Make sure that the IDF Path environment variable is defined
-if(NOT DEFINED ENV{IDF_PATH})
-  message(FATAL_ERROR "The IDF_PATH environment variable must point to the location of the ESP-IDF.")
+file(GLOB srcs_micro
+          "${tfmicro_dir}/*.cc"
+          "${tfmicro_dir}/*.c")
+
+file(GLOB src_micro_frontend
+          "${tfmicro_frontend_dir}/*.c"
+          "${tfmicro_frontend_dir}/*.cc")
+
+file(GLOB srcs_tflite_bridge
+          "${tfmicro_dir}/tflite_bridge/*.c"
+          "${tfmicro_dir}/tflite_bridge/*.cc")
+
+file(GLOB srcs_kernels
+          "${tfmicro_kernels_dir}/*.c"
+          "${tfmicro_kernels_dir}/*.cc")
+
+# remove sources which will be provided by esp_nn
+list(REMOVE_ITEM srcs_kernels
+          "${tfmicro_kernels_dir}/add.cc"
+          "${tfmicro_kernels_dir}/conv.cc"
+          "${tfmicro_kernels_dir}/depthwise_conv.cc"
+          "${tfmicro_kernels_dir}/fully_connected.cc"
+          "${tfmicro_kernels_dir}/mul.cc"
+          "${tfmicro_kernels_dir}/pooling.cc"
+          "${tfmicro_kernels_dir}/softmax.cc")
+
+FILE(GLOB esp_nn_kernels
+          "${tfmicro_kernels_dir}/esp_nn/*.cc")
+
+set(lib_srcs
+          "${srcs_micro}"
+          "${srcs_kernels}"
+          "${srcs_tflite_bridge}"
+          "${esp_nn_kernels}"
+          "${src_micro_frontend}"
+          "${tflite_dir}/kernels/kernel_util.cc"
+          "${tflite_dir}/micro/memory_planner/greedy_memory_planner.cc"
+          "${tflite_dir}/micro/memory_planner/linear_memory_planner.cc"
+          "${tflite_dir}/micro/arena_allocator/non_persistent_arena_buffer_allocator.cc"
+          "${tflite_dir}/micro/arena_allocator/persistent_arena_buffer_allocator.cc"
+          "${tflite_dir}/micro/arena_allocator/recording_single_arena_buffer_allocator.cc"
+          "${tflite_dir}/micro/arena_allocator/single_arena_buffer_allocator.cc"
+          "${tflite_dir}/core/c/common.cc"
+          "${tflite_dir}/core/api/error_reporter.cc"
+          "${tflite_dir}/core/api/flatbuffer_conversions.cc"
+          "${tflite_dir}/core/api/op_resolver.cc"
+          "${tflite_dir}/core/api/tensor_utils.cc"
+          "${tflite_dir}/kernels/internal/common.cc"
+          "${tflite_dir}/kernels/internal/quantization_util.cc"
+          "${tflite_dir}/kernels/internal/portable_tensor_utils.cc"
+          "${tflite_dir}/kernels/internal/tensor_utils.cc"
+          "${tflite_dir}/kernels/internal/tensor_ctypes.cc"
+          "${tflite_dir}/kernels/internal/reference/portable_tensor_utils.cc"
+          "${tflite_dir}/kernels/internal/reference/comparisons.cc"
+          "${tflite_dir}/schema/schema_utils.cc")
+
+set(priv_req esp-nn)
+
+# include component requirements which were introduced after IDF version 4.1
+if("${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}" VERSION_GREATER "4.1")
+    list(APPEND priv_req esp_timer driver)
 endif()
 
 idf_component_register(
-  SRCS tensorflow/lite/micro/simple_memory_allocator.cc tensorflow/lite/micro/micro_error_reporter.cc tensorflow/lite/micro/all_ops_resolver.cc tensorflow/lite/micro/memory_helpers.cc tensorflow/lite/micro/test_helpers.cc tensorflow/lite/micro/micro_time.cc tensorflow/lite/micro/recording_micro_allocator.cc tensorflow/lite/micro/recording_simple_memory_allocator.cc tensorflow/lite/micro/micro_string.cc tensorflow/lite/micro/micro_profiler.cc tensorflow/lite/micro/micro_utils.cc tensorflow/lite/micro/debug_log.cc tensorflow/lite/micro/micro_allocator.cc tensorflow/lite/micro/micro_interpreter.cc tensorflow/lite/micro/benchmarks/keyword_scrambled_model_data.cc tensorflow/lite/micro/kernels/pooling.cc tensorflow/lite/micro/kernels/prelu.cc tensorflow/lite/micro/kernels/softmax.cc tensorflow/lite/micro/kernels/concatenation.cc tensorflow/lite/micro/kernels/dequantize.cc tensorflow/lite/micro/kernels/pad.cc tensorflow/lite/micro/kernels/ethosu.cc tensorflow/lite/micro/kernels/reduce.cc tensorflow/lite/micro/kernels/l2norm.cc tensorflow/lite/micro/kernels/resize_nearest_neighbor.cc tensorflow/lite/micro/kernels/tanh.cc tensorflow/lite/micro/kernels/kernel_util.cc tensorflow/lite/micro/kernels/ceil.cc tensorflow/lite/micro/kernels/arg_min_max.cc tensorflow/lite/micro/kernels/conv.cc tensorflow/lite/micro/kernels/sub.cc tensorflow/lite/micro/kernels/add.cc tensorflow/lite/micro/kernels/split_v.cc tensorflow/lite/micro/kernels/kernel_runner.cc tensorflow/lite/micro/kernels/round.cc tensorflow/lite/micro/kernels/pack.cc tensorflow/lite/micro/kernels/floor.cc tensorflow/lite/micro/kernels/hard_swish.cc tensorflow/lite/micro/kernels/unpack.cc tensorflow/lite/micro/kernels/svdf.cc tensorflow/lite/micro/kernels/quantize.cc tensorflow/lite/micro/kernels/activations.cc tensorflow/lite/micro/kernels/mul.cc tensorflow/lite/micro/kernels/maximum_minimum.cc tensorflow/lite/micro/kernels/reshape.cc tensorflow/lite/micro/kernels/strided_slice.cc tensorflow/lite/micro/kernels/neg.cc tensorflow/lite/micro/kernels/logical.cc tensorflow/lite/micro/kernels/elementwise.cc tensorflow/lite/micro/kernels/comparisons.cc tensorflow/lite/micro/kernels/fully_connected.cc tensorflow/lite/micro/kernels/depthwise_conv.cc tensorflow/lite/micro/kernels/split.cc tensorflow/lite/micro/kernels/logistic.cc tensorflow/lite/micro/kernels/circular_buffer.cc tensorflow/lite/micro/memory_planner/linear_memory_planner.cc tensorflow/lite/micro/memory_planner/greedy_memory_planner.cc tensorflow/lite/micro/testing/test_conv_model.cc tensorflow/lite/c/common.c tensorflow/lite/core/api/error_reporter.cc tensorflow/lite/core/api/flatbuffer_conversions.cc tensorflow/lite/core/api/op_resolver.cc tensorflow/lite/core/api/tensor_utils.cc tensorflow/lite/kernels/internal/quantization_util.cc tensorflow/lite/kernels/kernel_util.cc tensorflow/lite/micro/testing/test_utils.cc 
-  INCLUDE_DIRS . third_party/gemmlowp third_party/flatbuffers/include third_party/ruy)
+            SRCS "${lib_srcs}"
+            INCLUDE_DIRS "." "third_party/gemmlowp"
+                         "third_party/flatbuffers/include"
+                         "third_party/ruy"
+                         "third_party/kissfft"
+            REQUIRES ${pub_req}
+            PRIV_REQUIRES ${priv_req})
 
 # Reduce the level of paranoia to be able to compile TF sources
 target_compile_options(${COMPONENT_LIB} PRIVATE
+  -Wno-error=attributes
   -Wno-maybe-uninitialized
   -Wno-missing-field-initializers
+  -Wno-error=sign-compare
+  -Wno-error=double-promotion
   -Wno-type-limits)
 
-target_compile_options(${COMPONENT_LIB} PRIVATE -DTF_LITE_STATIC_MEMORY -Werror -Wsign-compare -Wdouble-promotion -Wshadow -Wunused-variable -Wmissing-field-initializers -Wunused-function -Wswitch -Wvla -O3 -Wno-nonnull)
-target_compile_options(${COMPONENT_LIB} PRIVATE $<$<COMPILE_LANGUAGE:CXX>: -std=c++11 -Wstrict-aliasing -DTF_LITE_STATIC_MEMORY -Werror -Wsign-compare -Wdouble-promotion -Wshadow -Wunused-variable -Wmissing-field-initializers -Wunused-function -Wswitch -Wvla -O3  -Wno-return-type -Wno-strict-aliasing >)
-target_compile_options(${COMPONENT_LIB} INTERFACE $<$<IN_LIST:-DTF_LITE_STATIC_MEMORY,$<TARGET_PROPERTY:${COMPONENT_LIB},COMPILE_OPTIONS>>:-DTF_LITE_STATIC_MEMORY>)
+if("${IDF_VERSION_MAJOR}.${IDF_VERSION_MINOR}" VERSION_GREATER_EQUAL "5.0")
+  target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error=stringop-overread)
+endif()
+
+# enable ESP-NN optimizations by Espressif
+target_compile_options(${COMPONENT_LIB} PRIVATE -DESP_NN)
+
+set(common_flags -DTF_LITE_STATIC_MEMORY -DTF_LITE_DISABLE_X86_NEON -O3
+                 -Wstrict-aliasing -Wno-unused-parameter -Wall -Wextra -Wvla
+                 -Wsign-compare -Wdouble-promotion -Wswitch -Wunused-function
+                 -Wmissing-field-initializers -ffunction-sections -fdata-sections
+                 -Wshadow -Wunused-variable -fno-unwind-tables -fmessage-length=0)
+
+target_compile_options(${COMPONENT_LIB} PRIVATE ${common_flags} -fmessage-length=0 -Wno-nonnull)
+target_compile_options(${COMPONENT_LIB} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
+                                      ${common_flags} -std=c++11 -fno-rtti -fno-exceptions
+                                      -fno-threadsafe-statics -Werror -Wno-return-type
+                                      -Wno-strict-aliasing -std=gnu++14 >)
+
+# avoid issue of compiler internal error caused in `depthwise_conv_flaot.h
+set_source_files_properties(${tfmicro_kernels_dir}/esp_nn/depthwise_conv.cc
+                            PROPERTIES COMPILE_FLAGS -O2)
+
+target_compile_options(${COMPONENT_LIB} INTERFACE -DTF_LITE_STATIC_MEMORY)
 target_link_libraries(${COMPONENT_LIB} PRIVATE -lm)

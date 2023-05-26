@@ -12,13 +12,11 @@ const unsigned long SERIAL_CONNECTION_TIMEOUT = 1000;
 const uint32_t SAMPLE_RATE = 16000;
 
 // Audio input pins
-// todo: test and select better fitting pins
 const uint8_t AUDIO_IN_SCK_PIN = 4;
 const uint8_t AUDIO_IN_WS_PIN = 5;
 const uint8_t AUDIO_IN_DATA_PIN = 18;
 
 // Audio output pins
-// todo: set these pins
 const uint8_t AUDIO_OUT_SCK_PIN = 1;
 const uint8_t AUDIO_OUT_WS_PIN = 2;
 const uint8_t AUDIO_OUT_DATA_PIN = 15;
@@ -63,16 +61,18 @@ const unsigned long RECV_RESPONSE_TIMEOUT = 10000;
 const unsigned long CHATGPT_RECV_RESPONSE_TIMEOUT = 120000; // todo: maybe even longer?
 
 // Speech synthesis settings
-const float SPEECH_SYNTHESIS_PITCH = 0.9f;
-const float SPEECH_SYNTHESIS_SPEED = 1.1f;
+const float SPEECH_SYNTHESIS_PITCH = 0.75f;
+const float SPEECH_SYNTHESIS_SPEED = 1.f;
 const float SPEECH_SYNTHESIS_VOLUME = 1.f;
-const float SPEECH_SYNTHESIS_GAIN = 0.3f;
-const int SPEECH_SYNTHESIS_CONTRAST = 0;
+const float SPEECH_SYNTHESIS_GAIN = 0.5f;
+const int SPEECH_SYNTHESIS_CONTRAST = 1;
 
 // LED settings
 const size_t NO_LEDS = 1;
 const uint8_t LED_PIN = 48;
-const size_t NO_INIT_STEPS = 12;
+const size_t NO_INIT_STEPS = 9;
 
+// watchdog settings
+const uint32_t WATCHDOG_TIMEOUT = 10;
 
 #endif

@@ -3,8 +3,11 @@
 
 #include "config.h"
 #include "common.h"
+#include "led/led_driver.h"
 
 TaskHandle_t m_milena_task_handle;
+extern led_driver_ptr led;
+extern speech_synthesizer_ptr synthesizer;
 
 speech_synthesizer::speech_synthesizer()
 {
@@ -19,72 +22,80 @@ speech_synthesizer::speech_synthesizer()
   m_milena->setContrast(SPEECH_SYNTHESIS_CONTRAST);
 
   m_audio_output = std::make_unique<AudioOutputI2S>(1);
-  m_audio_output->SetBitsPerSample(32);
+  m_audio_output->SetBitsPerSample(16);
   m_audio_output->SetChannels(1);
   m_audio_output->SetRate(SAMPLE_RATE);
   m_audio_output->SetOutputModeMono(true);
   m_audio_output->SetPinout(AUDIO_OUT_SCK_PIN, AUDIO_OUT_WS_PIN, AUDIO_OUT_DATA_PIN);
   m_audio_output->SetGain(SPEECH_SYNTHESIS_GAIN);
 
+  led->next_init_step();
+}
+
+void speech_synthesizer::start()
+{
   xTaskCreatePinnedToCore(
-    [](void* param)
+    [](void*)
     {
-      auto* speech = (speech_synthesizer*) param;
+      synthesizer->loop();
+    }, "Audio out task", 8192, nullptr, 0, &m_milena_task_handle, 0
+  );
+}
 
-      while (true)
+void speech_synthesizer::loop()
+{
+  while (true)
+  {
+    uint32_t ulNotValue = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(100));
+    if (ulNotValue > 0)
+    {
+      // Serial.println("Got signal to start speaking!");
+      m_speaking_idx = 0;
+
+      while (m_is_feeding || m_speaking_idx < m_speech_buffer.length())
       {
-        uint32_t ulNotValue = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(100));
-        if (ulNotValue > 0)
+        // get next word
+        const auto end_of_sentence = find_sentence_end(m_speech_buffer, m_speaking_idx);
+        // const auto end_of_sentence = speech->m_speech_buffer.find(".", speech->m_speaking_idx);
+        if (end_of_sentence == std::string::npos)
         {
-          // Serial.println("Got signal to start speaking!");
-          speech->m_speaking_idx = 0;
+          // Serial.println("Waiting for buffer to be filled.");
+          vTaskDelay(pdMS_TO_TICKS(50));
+          continue;
+        }
 
-          while (speech->m_is_feeding || speech->m_speaking_idx < speech->m_speech_buffer.length())
+        const auto sentence = m_speech_buffer.substr(m_speaking_idx, end_of_sentence - m_speaking_idx);
+        // Serial.printf("Next sentence to say: %s\n", sentence.c_str());
+
+        // todo: do something with this error: I2S: register I2S object to platform failed
+        if (!m_milena->begin(sentence.c_str(), m_audio_output.get()))
+        {
+          Serial.println("Unable to start speech synthesis!");
+          break;
+        }
+
+        while (m_milena->isRunning())
+        {
+          if (!m_milena->loop())
           {
-            // get next word
-            const auto end_of_sentence = speech->find_sentence_end(speech->m_speech_buffer, speech->m_speaking_idx);
-            // const auto end_of_sentence = speech->m_speech_buffer.find(".", speech->m_speaking_idx);
-            if (end_of_sentence == std::string::npos)
-            {
-              // Serial.println("Waiting for buffer to be filled.");
-              vTaskDelay(pdMS_TO_TICKS(50));
-              continue;
-            }
-
-            const auto sentence = speech->m_speech_buffer.substr(speech->m_speaking_idx, end_of_sentence - speech->m_speaking_idx);
-            // Serial.printf("Next sentence to say: %s\n", sentence.c_str());
-
-            // todo: do something with this error: I2S: register I2S object to platform failed
-            if (!speech->m_milena->begin(sentence.c_str(), speech->m_audio_output.get()))
-            {
-              Serial.println("Error during speech synthesis!");
-              break;
-            }
-
-            while (speech->m_milena->isRunning())
-            {
-              if (!speech->m_milena->loop())
-              {
-                speech->m_milena->stop();
-                break;
-              }
-
-              taskYIELD();
-            }
-            // Serial.println("The sentence has been spoken!");
-
-            speech->m_speaking_idx = end_of_sentence + 1; // +1 to consume dot
-            taskYIELD();
+            m_milena->stop();
+            break;
           }
 
-          // Serial.println("Synthesizer finished talking!");
-
-          speech->m_is_talking = false;
-          speech->m_speech_buffer.clear();
+          taskYIELD();
         }
+        // Serial.println("The sentence has been spoken!");
+
+        m_speaking_idx = end_of_sentence + 1; // +1 to consume dot
+        taskYIELD();
       }
-    }, "Audio out task", 8192, this, 0, &m_milena_task_handle, 0
-  );
+
+      // Serial.println("Synthesizer finished talking!");
+
+      m_is_talking = false;
+      m_speech_buffer.clear();
+    }
+  }
 }
 
 void speech_synthesizer::say(const std::string& text)

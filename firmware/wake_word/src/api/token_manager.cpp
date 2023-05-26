@@ -3,22 +3,39 @@
 
 #include <ArduinoJson.h>
 
-const char PRIVATE_KEY[] PROGMEM = "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQChuvAXJE1cHuJQ\nWwu9e9YgYM/jaePu+L/BOqOMols/sPCsyQUIsU033dZNDZ4XzbKqwsE4wN1LUfYF\nELl1jwcwyqlnm+6jJb3FLdrD8rmsD4Ml8qcZnPHndhY3ba7mlWRN0CsNeYhMsOtJ\nBcUJ+byQnIVPuYlE+YviqEYHzzaHdN7qRxJjZfEDaH4/QhHEcyiV40l4f0TPI5Xu\nK7kjdqtul3B3Q4WUP5JE+DvhS35u06bkx/9etKd4L3mOKQVpJU6Z6UlLtkhr4x+R\nN4G3yJ8HhnC3w1Mvb8U4TfoOUz434b7T+p951EEno16X130qdqXaulGuyRLTYBCh\nRBRuv0y7AgMBAAECggEABDgZ8r8BMtghak9w8N2hE+r119M+ELcCwm05Sz47219n\n0yVS95hi6p3joDks0lnzTi4ffhxviXswmMHVCY9hWvEzVl8eH7mooWy7tzHtWXyo\n6YQF8cHQGiXQy/Uu3P5+HxbBQ/kGlVpmNCgtrQylUfzeidpnjabLv4fi4wN39jRx\n8eIbvWj/2oLZJ0wl0nX1Qt/JZLUSogt8qvvUw/9+vrex+cGQSv6diQy2Pry+n2d+\nY632UvhNv7weRpGx9X2/004npSXUxJlcww49hsCjMlBgPaiRtlRrrzcHCf7auWup\nnHOPOLhpX9/Fai/rDsxXta5bUJPNtH/+KQdBsh5RdQKBgQDhqQl/GukpyJSV+iAh\n6lGApUYdjBoIl/4hQ8cbjERHLF7Xbv3SnT9cpz9U4MF3NxeoWDejT6aqWZ8j+8Dv\nFqldGaNJg7v7a9Ls5N5uBzXmHN8a5O0csvL8wpSuUZodLD6qgzM83Xw2SQgO3vR8\nFHbGuEZDzqw7vGd6T0c2UjoOpwKBgQC3eYCnE0BKi3liLTCfdWxmXdpEkg0UsrBR\nJzJEhkhlZQ7iCOzayQvW2tJT9MG0itWOCwV7G9pMO6Wjy3WmHRpQe+tMPCE+hDa+\nyp+xsKNwtQ2UjpJT8GgOyNbcNkNcRNoxD/alL3eqwe0CBD4ro0nPHAjnv4NKbeB8\nacNSP60HzQKBgQDCMUN43GG2kWQ8xGkOhqTovlHeb4ifyJzrZ3Za4JSJY0eiwWMw\n8h1q0IqRsnEK9KApQPFwWsUkZ8epoabgmXHaKov4YaNNs/Zp4nL/4LijdEkSzdq3\nDdBJb/GfKZ4kaMTs28cmI7wWwzZqBbgDZ2DnlgDxrVNOfM3X1Y2E07IelQKBgEFJ\nItZQq1fbOV4N5ndXOTNTwg8USUNMMiEuaVyoy6oIw7r6og1X7LaPNrhZJ3Qu0r6w\nfUrJJmxp7Q7TnxF02aA5+AgwfUPZmAFb6Gc6C25XfnWWJctoiB56qLnDNUTn2xwK\nKiGtOk+wob1N9TFh8SmZODH+m6EoZ/DdUXs63T8hAoGBAKNDu+SEjYhHjBXtHk1V\nD9veWhiwYLuJP0z/VHFS52p5bOSTbfyikTCBVyc++/l2aQF/emrnt4blShAmFx9+\naL6xHlv1lSj462qTXerIbHvuJltS1VZ9TsfPOue0vEvbawdY0PrF8wehbACFs4/H\nHTk5pf5UTCxcYbMm3RH6VjaP\n-----END PRIVATE KEY-----\n";
-const char GOOGLE_TOKEN_HOST[] PROGMEM = "www.googleapis.com";
+const char PRIVATE_KEY[] = "";
+const char GOOGLE_TOKEN_HOST[] = "www.googleapis.com";
+
+TaskHandle_t token_task_handle;
 
 token_manager::token_manager()
 {
   m_ntp_client.begin();
   m_client.setInsecure();
+}
 
-  // todo: create task for this to speed up initialization
-  get_new_token();
+void token_manager::start()
+{
+  xTaskCreatePinnedToCore(
+    [](void* p)
+    {
+      token_manager* tm = (token_manager*)p;
+
+      while (true)
+      {
+        if (tm->token_expired())
+          tm->get_new_token();
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
+      }
+    }, "AI task", 8192, this, 1, &token_task_handle, 1
+  );
 }
 
 const std::string& token_manager::get_token()
 {
-  if (token_expired())
-    get_new_token();
+  while (token_expired())
+    vTaskDelay(100);
 
   return m_token;
 }
@@ -32,7 +49,7 @@ void token_manager::get_new_token()
   m_client.stop();
   if (auto ret = m_client.connect(GOOGLE_TOKEN_HOST, 443); ret == 0)
   {
-    Serial.printf("Unable to connect: %d\n", ret);
+    Serial.printf("Unable to connect to %s: %d\n", GOOGLE_TOKEN_HOST, ret);
     return;
   }
 
@@ -67,7 +84,7 @@ std::string token_manager::prepare_token_request()
 
 std::string token_manager::get_jwt()
 {
-  const std::string header_base64 PROGMEM = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9";
+  const std::string header_base64 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9";
 
   m_ntp_client.update();
   const auto cur_tm = m_ntp_client.getEpochTime();

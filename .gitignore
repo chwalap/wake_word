@@ -1,0 +1,54 @@
+
+# Preprocessed files
+*.npz
+
+# Recordings
+model/data/_bgnoise/
+model/data/_talking/
+model/data/backward/
+model/data/bed/
+model/data/bird/
+model/data/cat/
+model/data/dog/
+model/data/down/
+model/data/eight/
+model/data/five/
+model/data/follow/
+model/data/forward/
+model/data/four/
+model/data/go/
+model/data/happy/
+model/data/house/
+model/data/learn/
+model/data/left/
+model/data/marvin/
+model/data/nine/
+model/data/no/
+model/data/off/
+model/data/on/
+model/data/one/
+model/data/right/
+model/data/seven/
+model/data/sheila/
+model/data/six/
+model/data/stop/
+model/data/three/
+model/data/tree/
+model/data/two/
+model/data/up/
+model/data/visual/
+model/data/wow/
+model/data/yes/
+model/data/zero/
+
+# NN tuner
+model/tuner
+
+# .DS_Store
+.DS_Store
+
+# Jupyter checkpoints
+.ipynb_checkpoints
+
+# VSCode
+.vscode

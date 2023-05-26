@@ -1,7 +1,11 @@
 #include "i2s_sampler.h"
+#include "led/led_driver.h"
+
 #include <driver/i2s.h>
 
 extern TaskHandle_t detector_task_handle;
+extern led_driver_ptr led;
+extern i2s_sampler_ptr sampler;
 
 i2s_sampler::i2s_sampler()
 {
@@ -10,6 +14,8 @@ i2s_sampler::i2s_sampler()
     buffer = std::make_unique<audio_buffer>();
 
   m_ring_buffer = std::make_unique<ring_buffer>(m_audio_buffers);
+
+  led->next_init_step();
 }
 
 void i2s_sampler::start()
@@ -39,31 +45,34 @@ void i2s_sampler::start()
   assert(i2s_set_pin(I2S_NUM_0, &i2s_pins) == ESP_OK);
 
   xTaskCreatePinnedToCore(
-    [](void *p)
+    [](void*)
     {
-      i2s_sampler* sampler = (i2s_sampler*)p;
-
-      while (true)
-      {
-        i2s_event_t e;
-        if (xQueueReceive(sampler->m_queue, &e, portMAX_DELAY) == pdPASS)
-        {
-          if (e.type == I2S_EVENT_RX_DONE)
-          {
-            size_t bytes_read = 0;
-            do
-            {
-              uint8_t data[1024];
-              i2s_read(I2S_NUM_0, data, 1024, &bytes_read, 10);
-              sampler->process_data(data, bytes_read);
-            } while (bytes_read > 0);
-          }
-        }
-
-        taskYIELD();
-      }
-    }, "Audio in task", 8192, this, 1, &m_reader_handle, 0
+      sampler->loop();
+    }, "Audio in task", 8192, nullptr, 1, &m_reader_handle, 0
   );
+}
+
+void i2s_sampler::loop()
+{
+  while (true)
+  {
+    i2s_event_t e;
+    if (xQueueReceive(m_queue, &e, portMAX_DELAY) == pdPASS)
+    {
+      if (e.type == I2S_EVENT_RX_DONE)
+      {
+        size_t bytes_read = 0;
+        do
+        {
+          uint8_t data[1024];
+          i2s_read(I2S_NUM_0, data, 1024, &bytes_read, 10);
+          process_data(data, bytes_read);
+        } while (bytes_read > 0);
+      }
+    }
+
+    taskYIELD();
+  }
 }
 
 ring_buffer_ptr i2s_sampler::get_ring_buffer_reader()

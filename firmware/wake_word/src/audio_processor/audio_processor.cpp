@@ -39,6 +39,7 @@ bool audio_processor::get_spectrogram(ring_buffer_ptr& reader, float* spec_out)
   noise_floor /= (float) AUDIO_BUFFER_LENGTH;
 
   if (noise_floor < m_smoothed_noise_floor)
+
     m_smoothed_noise_floor = 0.7f * m_smoothed_noise_floor + noise_floor * 0.3f;
   else
     m_smoothed_noise_floor = 0.99f * m_smoothed_noise_floor + noise_floor * 0.01;

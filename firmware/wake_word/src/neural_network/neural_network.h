@@ -6,11 +6,11 @@
 // Arduino.h defines DEFAULT and it's used in some enum inside tflite
 #define DEFAULT_OLD DEFAULT
 #undef DEFAULT
-#include "tensorflow/lite/micro/all_ops_resolver.h"
-#include "tensorflow/lite/micro/micro_error_reporter.h"
+#include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
+#include "tensorflow/lite/micro/tflite_bridge/micro_error_reporter.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
-#include "tensorflow/lite/schema/schema_generated.h"
-#include "tensorflow/lite/version.h"
+// #include "tensorflow/lite/schema/schema_generated.h"
+// #include "tensorflow/lite/version.h"
 #define DEFAULT DEFAULT_OLD
 
 #include <memory>
@@ -32,7 +32,7 @@ struct neural_network
   void predict();
   void add_ops();
 
-  tflite_error_reporter_ptr m_error_reporter;
+  // tflite_error_reporter_ptr m_error_reporter;
   tflite_tensor_arena_ptr m_tensor_arena;
   tflite_interpreter_ptr m_interpreter;
   tflite_resolver_ptr m_resolver;

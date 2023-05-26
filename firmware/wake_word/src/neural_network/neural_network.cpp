@@ -7,12 +7,12 @@ extern unsigned int __model_len;
 
 neural_network::neural_network()
 {
-  m_error_reporter = std::make_unique<tflite::MicroErrorReporter>();
+  // m_error_reporter = std::make_unique<tflite::MicroErrorReporter>();
   m_tensor_arena = std::make_unique<tflite_tensor_arena_arr>();
   m_model = const_cast<tflite_model_ptr>(tflite::GetModel(__model));
   m_resolver = std::make_unique<tflite::MicroMutableOpResolver<10>>();
   add_ops();
-  m_interpreter = std::make_unique<tflite::MicroInterpreter>(m_model, *m_resolver, m_tensor_arena->data(), TENSOR_ARENA_SIZE, m_error_reporter.get());
+  m_interpreter = std::make_unique<tflite::MicroInterpreter>(m_model, *m_resolver, m_tensor_arena->data(), TENSOR_ARENA_SIZE); //, m_error_reporter.get());
   m_interpreter->AllocateTensors();
   m_input = m_interpreter->input(0);
   m_output = m_interpreter->output(0);

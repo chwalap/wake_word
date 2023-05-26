@@ -11,7 +11,9 @@
 struct i2s_sampler
 {
   i2s_sampler();
+
   void start();
+  void loop();
   void add_sample(int16_t sample);
   void process_data(uint8_t *data, size_t bytes_read);
   ring_buffer_ptr get_ring_buffer_reader();

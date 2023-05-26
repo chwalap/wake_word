@@ -10,6 +10,9 @@
 struct command_detector
 {
   command_detector();
+
+  void start();
+  void loop();
   void detect_wake_word();
   size_t get_best_score_idx() const;
 

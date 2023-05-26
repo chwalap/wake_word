@@ -12,6 +12,10 @@ using audio_output_ptr = std::unique_ptr<AudioOutputI2S>;
 struct speech_synthesizer
 {
   speech_synthesizer();
+
+  void loop();
+  void start();
+
   void say(const std::string& text);
   size_t find_sentence_end(const std::string& str, size_t pos = 0);
 

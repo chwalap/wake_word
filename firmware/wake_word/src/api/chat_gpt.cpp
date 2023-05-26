@@ -15,6 +15,7 @@ const char* OPENAI_API = "api.openai.com";
 chat_gpt::chat_gpt()
 {
   m_client.setInsecure();
+  led->next_init_step();
 }
 
 void chat_gpt::send_message(const std::string& message)
@@ -24,9 +25,9 @@ void chat_gpt::send_message(const std::string& message)
   m_message = message;
 
   m_client.stop();
-  if (m_client.connect(OPENAI_API, 443, 5000) == 0)
+  if (auto ret = m_client.connect(OPENAI_API, 443, 5000); ret == 0)
   {
-    Serial.println("Connection to ChatGPT API failed!");
+    Serial.printf("Unable to connect to %s: %d\n", OPENAI_API, ret);
     return;
   }
 
@@ -35,7 +36,6 @@ void chat_gpt::send_message(const std::string& message)
   const auto request = prepare_request();
   // Serial.println(request.c_str());
 
-  // todo: move this to common fn
   size_t all_sent_bytes = 0;
   while (all_sent_bytes < request.size())
   {
@@ -45,12 +45,12 @@ void chat_gpt::send_message(const std::string& message)
   }
 
   // todo: move this to fn
-  // String resp;
   auto recv_start = millis();
   auto json = std::make_unique<StaticJsonDocument<1024>>();
 
-  Serial.println("\n\n");
+  // Serial.println("\n\n");
 
+  // todo: handle errors
   while (millis() - recv_start < CHATGPT_RECV_RESPONSE_TIMEOUT)
   {
     String line = m_client.readStringUntil('\n');
@@ -67,21 +67,22 @@ void chat_gpt::send_message(const std::string& message)
       {
         synthesizer->say(content.c_str());
         // Serial.print(content);
-        // resp += content;
       }
     }
   }
-  Serial.println("\n\n");
+  // Serial.println("\n\n");
 
-  Serial.println("FEEDING IS DONE");
+  // Serial.println("FEEDING IS DONE");
   synthesizer->m_is_feeding = false;
-  Serial.println("waiting for synthesizer to finish talking");
+
+  // Serial.println("waiting for synthesizer to finish talking");
   while (synthesizer->m_is_talking)
     taskYIELD();
 
-  Serial.println("Ok, synthesizer finished talking! I can continue");
+  // Serial.println("Ok, synthesizer finished talking! I can continue");
 
   led->set_color(CRGB::Red);
+  m_client.stop();
 }
 
 std::string chat_gpt::prepare_payload() const
@@ -90,10 +91,10 @@ std::string chat_gpt::prepare_payload() const
     "{"
       "\"model\":\"gpt-3.5-turbo\","
       "\"messages\":["
-        // "" + get_startup_message() + ","
+        "" + get_startup_message() + ","
         "{\"role\":\"user\",\"content\": \"" + m_message + "\"}"
       "],"
-     "\"temperature\":0.2,"
+     "\"temperature\":0.4,"
      "\"stream\":true"
    "}";
 
@@ -118,7 +119,7 @@ std::string chat_gpt::prepare_request() const
 
 std::string chat_gpt::get_startup_message() const
 {
-  return R"({"role":"system","content": "Zapomnij wszystko to co Ci dotychczas powiedziałem. Od teraz jesteś moim asystentem Smart Home. Oto kilka reguł których musisz bezwzględnie przestrzegać:\n* Masz na imię \"komputer\". Każdą wiadomość będę rozpoczynał tym slowem.\n* Jesteś kobietą\n* Będziesz zwracał się do mnie per \"Mój Panie\".\n* Będę uczył Cię różnych poleceń. Na przykład jeśli powiem \"komputer, dodaj polecenie oświeć światła na zewnątrz\", albo \"komputer, dodaj polecenie ścisz muzykę\", Ty dodasz to polecenie do swojej bazy poleceń. Każdemu poleceniu nadasz kolejny numer. Po dodaniu nowego polecenia odpowiesz tylko \"Nowe polecenie X o numerze Y zostało dodane, Mój Panie\", gdzie X to nazwa polecenia, a Y to numer polecenia.\n* Będę wydawał Ci polecenia, na przykład w taki sposób: \"komputer ścisz muzykę\". Jeśli wcześniej nauczyłem Cię takiego polecenia to jedyne co odpowiesz to \"Polecenie Y wydane\", gdzie Y to numer polecenia."})"; // \n* Odpowiedz na tą wiadomość jednym zdaniem: \"Witaj mój Panie, jestem tu aby Ci służyć.\" Nie dodawaj nic więcej."})";
+  return R"({"role":"system","content": "Jesteś moją asystentką. Zwracaj się do mnie Mój Panie. Odpowiadaj po polsku."})";
 }
 
 std::string chat_gpt::get_api_token() const

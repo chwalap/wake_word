@@ -11,9 +11,7 @@
 
 using recording_arr = std::array<uint16_t, MAX_RECORDING_LENGTH>;
 using recording_ptr = std::unique_ptr<recording_arr>;
-
 using compressed_arr = std::vector<uint8_t>;
-// using compressed_ptr = std::unique_ptr<compressed_arr>;
 
 struct google_speech_api
 {

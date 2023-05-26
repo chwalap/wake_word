@@ -12,6 +12,8 @@
 struct token_manager
 {
   token_manager();
+
+  void start();
   const std::string& get_token();
   void get_new_token();
   bool token_expired();
