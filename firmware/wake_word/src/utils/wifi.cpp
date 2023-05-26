@@ -1,11 +1,9 @@
 #include "wifi.h"
 #include <WiFi.h>
 #include "led/led_driver.h"
+#include "wifi_credentials.h"
 
 extern led_driver_ptr led;
-
-const char* SSID = "Smart";
-const char* PASSWORD = "dupa123kotki666";
 
 void wifi_connect()
 {

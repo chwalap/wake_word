@@ -3,3 +3,6 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+src/api/chat_gpt_key.h
+src/api/google_api_key.h
+src/utils/wifi_credentials.h

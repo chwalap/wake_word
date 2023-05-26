@@ -1,4 +1,5 @@
 #include "chat_gpt.h"
+#include "chat_gpt_key.h"
 #include "config.h"
 #include "utils/response_parser.h"
 #include "led/led_driver.h"
@@ -9,7 +10,6 @@
 extern led_driver_ptr led;
 extern speech_synthesizer_ptr synthesizer;
 
-const char* APIKEY = "";
 const char* OPENAI_API = "api.openai.com";
 
 chat_gpt::chat_gpt()

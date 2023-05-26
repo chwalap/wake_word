@@ -1,9 +1,9 @@
 #include "token_manager.h"
+#include "google_api_key.h"
 #include "utils/base64.h"
 
 #include <ArduinoJson.h>
 
-const char PRIVATE_KEY[] = "";
 const char GOOGLE_TOKEN_HOST[] = "www.googleapis.com";
 
 TaskHandle_t token_task_handle;
